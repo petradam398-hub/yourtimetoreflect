@@ -33,7 +33,7 @@ def wrap(text, font, d):
 def make(text, out, bg="background.jpg"):
     img = ImageOps.fit(Image.open(bg).convert("RGB"), (W, H), Image.LANCZOS)
     d = ImageDraw.Draw(img)
-    text = text.upper()
+    text = text.strip().rstrip(".").upper()  # no full stop at the end, ever
     for size in range(78, 40, -2):
         font = ImageFont.truetype(FONT, size)
         lines = wrap(text, font, d)
