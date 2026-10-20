@@ -2,11 +2,12 @@
 Usage: python3 make_post.py "QUOTE TEXT" output.png [background.jpg]
 """
 import sys
-from PIL import Image, ImageDraw, ImageFont, ImageOps
+from PIL import Image, ImageDraw, ImageFont, ImageOps, ImageStat
 
 W, H = 1080, 1350
 FONT = "/usr/share/fonts/truetype/dejavu/DejaVuSansCondensed-Bold.ttf"
-X0, MAX_W, BOTTOM = 500, 540, 120  # text block sits in the dark area, bottom right
+X0, MAX_W, BOTTOM = 500, 540, 120  # default: text block bottom right
+MARGIN = 60  # for the other candidate corners
 
 
 def wrap(text, font, d):
@@ -30,6 +31,19 @@ def wrap(text, font, d):
     return lines
 
 
+def best_spot(img, bw, bh):
+    """Pick the darkest, calmest corner for the text so white text stays readable.
+    Styling is unchanged; only the position adapts to the background."""
+    gray = img.convert("L")
+    spots = [(X0, H - BOTTOM - bh), (MARGIN, H - BOTTOM - bh),
+             (X0, BOTTOM), (MARGIN, BOTTOM)]
+    def score(p):
+        x, y = int(p[0]), int(p[1])
+        st = ImageStat.Stat(gray.crop((x - 20, y - 20, int(x + bw) + 20, int(y + bh) + 20)))
+        return st.mean[0] + 0.5 * st.stddev[0]
+    return min(spots, key=score)  # ties keep the original bottom-right spot
+
+
 def make(text, out, bg="background.jpg"):
     img = ImageOps.fit(Image.open(bg).convert("RGB"), (W, H), Image.LANCZOS)
     d = ImageDraw.Draw(img)
@@ -40,9 +54,11 @@ def make(text, out, bg="background.jpg"):
         lh = int(size * 1.13)
         if lh * len(lines) <= H * 0.5:
             break
-    y = H - BOTTOM - lh * len(lines)
+    block_h = lh * len(lines)
+    block_w = max(d.textlength(ln, font=font) for ln in lines)
+    x, y = best_spot(img, block_w, block_h)
     for ln in lines:
-        d.text((X0, y), ln, font=font, fill=(240, 240, 240))
+        d.text((x, y), ln, font=font, fill=(240, 240, 240))
         y += lh
     img.save(out, quality=95)
 
