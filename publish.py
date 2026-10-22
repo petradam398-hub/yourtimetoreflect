@@ -139,8 +139,28 @@ def publish_one(slot, cfg):
     print(f"Published to @{me.get('username')}: media id {post['id']}")
 
 
+def check():
+    """Verify token and publish permission without posting anything: a container is
+    created and processed but never published (Instagram discards it after 24 h)."""
+    me = api("GET", "me", fields="user_id,username,account_type")
+    print(f"Token OK for @{me.get('username')} ({me.get('account_type')})")
+    url = f"https://raw.githubusercontent.com/{REPO}/main/backgrounds/hoodie-teal.jpg"
+    container = api("POST", f"{me['user_id']}/media", image_url=url, caption="test")["id"]
+    for _ in range(30):
+        status = api("GET", container, fields="status_code").get("status_code")
+        if status == "FINISHED":
+            print("Publish permission OK - Instagram downloaded and accepted a test image (not published)")
+            return
+        if status in ("ERROR", "EXPIRED"):
+            sys.exit(f"Instagram rejected the test image ({status})")
+        time.sleep(5)
+    sys.exit("Instagram did not finish processing the test image in time")
+
+
 def main():
     cfg = load("config.json", {})
+    if os.environ.get("CHECK") == "1":
+        return check()
     if not DRY and not os.environ.get("IG_ACCESS_TOKEN"):
         print("IG_ACCESS_TOKEN secret is not set yet - nothing published")
         return

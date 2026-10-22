@@ -6,9 +6,9 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: "dry = render only, force = publish one post now"
+        description: "dry = render only, check = test token without posting, force = publish one post now"
         type: choice
-        options: [dry, force]
+        options: [dry, check, force]
         default: dry
 
 permissions:
@@ -32,6 +32,7 @@ jobs:
           IG_ACCESS_TOKEN: ${{ secrets.IG_ACCESS_TOKEN }}
           DRY_RUN: ${{ github.event.inputs.mode == 'dry' && '1' || '0' }}
           FORCE: ${{ github.event.inputs.mode == 'force' && '1' || '0' }}
+          CHECK: ${{ github.event.inputs.mode == 'check' && '1' || '0' }}
         run: |
           git config user.name "yourtimetoreflect-bot"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
