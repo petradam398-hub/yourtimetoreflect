@@ -1,11 +1,11 @@
 """Put a quote on the hoodie background (1080x1350, Instagram 4:5).
 Usage: python3 make_post.py "QUOTE TEXT" output.png [background.jpg]
 """
-import sys
+import os, sys
 from PIL import Image, ImageDraw, ImageFont, ImageOps, ImageStat
 
 W, H = 1080, 1350
-FONT = "/usr/share/fonts/truetype/dejavu/DejaVuSansCondensed-Bold.ttf"
+FONT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fonts", "DejaVuSansCondensed-Bold.ttf")
 X0, MAX_W, BOTTOM = 500, 540, 120  # default: text block bottom right
 MARGIN = 60  # for the other candidate corners
 
@@ -31,32 +31,61 @@ def wrap(text, font, d):
     return lines
 
 
+def spot_score(gray, x, y, bw, bh):
+    """Lower is better: dark and calm behind the text block."""
+    st = ImageStat.Stat(gray.crop((int(x) - 20, int(y) - 20, int(x + bw) + 20, int(y + bh) + 20)))
+    return st.mean[0] + 0.5 * st.stddev[0]
+
+
 def best_spot(img, bw, bh):
     """Pick the darkest, calmest corner for the text so white text stays readable.
     Styling is unchanged; only the position adapts to the background."""
     gray = img.convert("L")
     spots = [(X0, H - BOTTOM - bh), (MARGIN, H - BOTTOM - bh),
              (X0, BOTTOM), (MARGIN, BOTTOM)]
-    def score(p):
-        x, y = int(p[0]), int(p[1])
-        st = ImageStat.Stat(gray.crop((x - 20, y - 20, int(x + bw) + 20, int(y + bh) + 20)))
-        return st.mean[0] + 0.5 * st.stddev[0]
-    return min(spots, key=score)  # ties keep the original bottom-right spot
+    best = min(spots, key=lambda p: spot_score(gray, p[0], p[1], bw, bh))  # ties keep bottom-right
+    return best, spot_score(gray, best[0], best[1], bw, bh)
 
 
-def make(text, out, bg="background.jpg"):
-    img = ImageOps.fit(Image.open(bg).convert("RGB"), (W, H), Image.LANCZOS)
+def layout(img, text):
     d = ImageDraw.Draw(img)
     text = text.strip().rstrip(".").upper()  # no full stop at the end, ever
     for size in range(78, 40, -2):
         font = ImageFont.truetype(FONT, size)
         lines = wrap(text, font, d)
         lh = int(size * 1.13)
-        if lh * len(lines) <= H * 0.5:
+        fits_width = all(d.textlength(ln, font=font) <= MAX_W for ln in lines)
+        if fits_width and lh * len(lines) <= H * 0.5:
             break
-    block_h = lh * len(lines)
     block_w = max(d.textlength(ln, font=font) for ln in lines)
-    x, y = best_spot(img, block_w, block_h)
+    (x, y), score = best_spot(img, block_w, lh * len(lines))
+    return font, lines, lh, x, y, score
+
+
+def load_bg(bg):
+    return ImageOps.fit(Image.open(bg).convert("RGB"), (W, H), Image.LANCZOS)
+
+
+def readability(text, bg):
+    """(score, bright share) behind the text at its best spot. Lower is easier to read.
+    bright share = part of the area under the text lighter than mid-grey, which catches
+    text sitting over a face, a hood or a lamp even when the average looks dark."""
+    img = load_bg(bg)
+    font, lines, lh, x, y, score = layout(img, text)
+    bw = max(ImageDraw.Draw(img).textlength(ln, font=font) for ln in lines)
+    hist = img.convert("L").crop((int(x) - 20, int(y) - 20, int(x + bw) + 20, int(y + lh * len(lines)) + 20)).histogram()
+    return score, sum(hist[110:]) / sum(hist)
+
+
+def is_readable(text, bg):
+    score, bright = readability(text, bg)
+    return score <= 55 and bright <= 0.005
+
+
+def make(text, out, bg="background.jpg"):
+    img = load_bg(bg)
+    d = ImageDraw.Draw(img)
+    font, lines, lh, x, y, _ = layout(img, text)
     for ln in lines:
         d.text((x, y), ln, font=font, fill=(240, 240, 240))
         y += lh
