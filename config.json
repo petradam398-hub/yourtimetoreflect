@@ -5,5 +5,5 @@
   ],
   "max_posts_per_day": 25,
   "background_cooldown": 5,
-  "enabled": false
+  "enabled": true
 }
