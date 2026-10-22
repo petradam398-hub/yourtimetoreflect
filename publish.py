@@ -107,9 +107,12 @@ def publish_one(slot, cfg):
         sys.exit("queue.json is empty - add new quotes before the next post")
     entry = queue[0]
     date, hhmm = slot.split()
-    bg = pick_background(cfg, entry["quote"])
+    # entries written for a specific photo keep it; others get a readable random one
+    bg = entry.get("background")
+    if not bg or not os.path.exists(f"backgrounds/{bg}"):
+        bg = pick_background(cfg, entry["quote"])
     out = f"posts/{date}-{hhmm.replace(':', '')}.jpg"
-    make(entry["quote"], out, f"backgrounds/{bg}")
+    make(entry["quote"], out, f"backgrounds/{bg}", entry.get("spot"))
     print(f"[{slot}] {entry['quote']}  ({bg}) -> {out}")
     if DRY:
         return

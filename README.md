@@ -14,9 +14,10 @@ Example, three posts a day: `"times": ["08:00", "13:00", "19:00"]`
 
 ## Files
 
-- `queue.json` - upcoming posts (quote + caption), used from the top. When it runs out, posting stops and GitHub emails you.
+- `queue.json` - upcoming posts, used from the top. Each entry: `quote`, `caption`, and usually `background` (the photo the quote was written for) and optional `spot` (bottom-right / bottom-left / top-right / top-left) to keep the text off a face. When the queue runs out, posting stops and GitHub emails you.
+- Writing style: simple English (short sentences, basic words), no emoji, no full stop at the end of the quote. The quote must match the photo: suit/watch = money, gym = body and discipline, car = luxury, boxing = toughness, alone = focus on yourself.
 - `publish.py` - takes the next entry, picks a readable background, renders the image, pushes it and publishes it.
-- `make_post.py` - image style: white bold caps, no full stop, no colours, no lines; text goes to the darkest corner.
+- `make_post.py` - image style: white bold caps, no full stop, no colours, no lines; text goes to the darkest corner, and on brighter photos the area behind the text is softly darkened.
 - `backgrounds/` - photos to rotate through (dark/moody only).
 - `posted_log.txt`, `quotes_used.txt`, `backgrounds_used.txt` - history, so nothing is posted twice.
 
