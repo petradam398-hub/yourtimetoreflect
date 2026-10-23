@@ -2,7 +2,7 @@ name: Post to Instagram
 
 on:
   schedule:
-    - cron: "7,37 * * * *"   # every 30 min; publish.py decides what is due (times in config.json)
+    - cron: "7,37 * * * *"   # every 30 min; publish.py waits for the exact time in config.json
   workflow_dispatch:
     inputs:
       mode:
@@ -21,6 +21,7 @@ concurrency:
 jobs:
   post:
     runs-on: ubuntu-latest
+    timeout-minutes: 75
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5

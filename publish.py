@@ -20,6 +20,7 @@ from make_post import make, is_readable, readability
 API = "https://graph.instagram.com/v23.0"
 REPO = os.environ.get("GITHUB_REPOSITORY", "petradam398-hub/yourtimetoreflect")
 CATCH_UP = timedelta(hours=3)  # a slot missed by more than this is skipped, not posted late
+LOOKAHEAD = timedelta(minutes=55)  # GitHub starts scheduled runs late, so start early and wait
 
 DRY = os.environ.get("DRY_RUN") == "1"
 FORCE = os.environ.get("FORCE") == "1"
@@ -83,6 +84,17 @@ def due_slots(cfg, now):
     return slots
 
 
+def next_slot(cfg, now):
+    """The next not-yet-posted slot starting within LOOKAHEAD (to wait for), or None."""
+    posted = set(lines("posted_log.txt"))
+    for t in sorted(cfg["times"]):
+        h, m = map(int, t.split(":"))
+        at = now.replace(hour=h, minute=m, second=0, microsecond=0)
+        if f"{now.date().isoformat()} {t}" not in posted and now < at <= now + LOOKAHEAD:
+            return at
+    return None
+
+
 def pick_background(cfg, quote):
     """Random background that was not used recently AND keeps the white text readable."""
     names = sorted(f for f in os.listdir("backgrounds") if f.lower().endswith((".jpg", ".jpeg", ".png")))
@@ -124,6 +136,7 @@ def publish_one(slot, cfg):
     append("posted_log.txt", slot)
     git("add", "-A")
     git("commit", "-qm", f"Post {slot}")
+    git("pull", "-q", "--rebase", "origin", "main")  # keep edits made meanwhile (e.g. config.json)
     git("push", "-q", "origin", "HEAD")
     sha = subprocess.run(["git", "rev-parse", "HEAD"], capture_output=True, text=True, check=True).stdout.strip()
     image_url = f"https://raw.githubusercontent.com/{REPO}/{sha}/{out}"
@@ -177,6 +190,14 @@ def main():
         posted_today = [l for l in lines("posted_log.txt") if l.startswith(now.date().isoformat())]
         room = max(0, int(cfg.get("max_posts_per_day", 25)) - len(posted_today))
         slots = due_slots(cfg, now)[:room]
+        if not slots and room and not DRY:
+            at = next_slot(cfg, now)
+            if at:
+                wait = (at - now).total_seconds()
+                print(f"Waiting {wait / 60:.0f} min to post exactly at {at:%H:%M}")
+                time.sleep(max(0, wait))
+                now = datetime.now(now.tzinfo)
+                slots = due_slots(cfg, now)[:room]
     if not slots:
         print(f"{now:%Y-%m-%d %H:%M} nothing due")
         return
