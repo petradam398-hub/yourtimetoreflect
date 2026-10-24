@@ -53,6 +53,15 @@ def append(path, text):
         f.write(text + "\n")
 
 
+def fail(msg):
+    print(f"::error::{msg}", flush=True)
+    sys.exit(msg)
+
+
+def note(msg):
+    print(f"::notice::{msg}", flush=True)
+
+
 def api(method, path, **params):
     params["access_token"] = os.environ["IG_ACCESS_TOKEN"]
     data = parse.urlencode(params).encode()
@@ -66,7 +75,7 @@ def api(method, path, **params):
             return json.load(r)
     except error.HTTPError as e:
         body = e.read().decode(errors="replace").replace(os.environ["IG_ACCESS_TOKEN"], "***")
-        sys.exit(f"Instagram API error {e.code} on {path}: {body}")
+        fail(f"Instagram API error {e.code} on {path}: {body}")
 
 
 def due_slots(cfg, now):
@@ -110,13 +119,15 @@ def pick_background(cfg, quote):
 
 
 def git(*args):
-    subprocess.run(["git", *args], check=True)
+    r = subprocess.run(["git", *args], capture_output=True, text=True)
+    if r.returncode:
+        fail(f"git {' '.join(args[:2])} failed: {(r.stderr or r.stdout).strip()[-400:]}")
 
 
 def publish_one(slot, cfg):
     queue = load("queue.json", [])
     if not queue:
-        sys.exit("queue.json is empty - add new quotes before the next post")
+        fail("queue.json is empty - add new quotes before the next post")
     entry = queue[0]
     date, hhmm = slot.split()
     # entries written for a specific photo keep it; others get a readable random one
@@ -149,28 +160,30 @@ def publish_one(slot, cfg):
         if status == "FINISHED":
             break
         if status in ("ERROR", "EXPIRED"):
-            sys.exit(f"Instagram could not process the image ({status}) for {image_url}")
+            fail(f"Instagram could not process the image ({status}) for {image_url}")
         time.sleep(5)
+    else:
+        fail(f"Instagram was still processing the image after 150 s ({status}) for {image_url}")
     post = api("POST", f"{ig_id}/media_publish", creation_id=container)
-    print(f"Published to @{me.get('username')}: media id {post['id']}")
+    note(f"Published {slot} to @{me.get('username')}: media id {post['id']}")
 
 
 def check():
     """Verify token and publish permission without posting anything: a container is
     created and processed but never published (Instagram discards it after 24 h)."""
     me = api("GET", "me", fields="user_id,username,account_type")
-    print(f"Token OK for @{me.get('username')} ({me.get('account_type')})")
+    note(f"Token OK for @{me.get('username')} ({me.get('account_type')})")
     url = f"https://raw.githubusercontent.com/{REPO}/main/backgrounds/hoodie-teal.jpg"
     container = api("POST", f"{me['user_id']}/media", image_url=url, caption="test")["id"]
     for _ in range(30):
         status = api("GET", container, fields="status_code").get("status_code")
         if status == "FINISHED":
-            print("Publish permission OK - Instagram downloaded and accepted a test image (not published)")
+            note("Publish permission OK - test image accepted (not published)")
             return
         if status in ("ERROR", "EXPIRED"):
-            sys.exit(f"Instagram rejected the test image ({status})")
+            fail(f"Instagram rejected the test image ({status})")
         time.sleep(5)
-    sys.exit("Instagram did not finish processing the test image in time")
+    fail("Instagram did not finish processing the test image in time")
 
 
 def main():
@@ -206,4 +219,9 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except SystemExit:
+        raise
+    except Exception as e:  # anything unexpected still shows up as a readable error
+        fail(f"Unexpected error: {e!r}")
