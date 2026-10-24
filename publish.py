@@ -15,7 +15,7 @@ from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 from urllib import request, parse, error
 
-from make_post import make, is_readable, readability
+from make_post import make, make_story, is_readable, readability
 
 API = "https://graph.instagram.com/v23.0"
 REPO = os.environ.get("GITHUB_REPOSITORY", "petradam398-hub/yourtimetoreflect")
@@ -136,7 +136,10 @@ def publish_one(slot, cfg):
         bg = pick_background(cfg, entry["quote"])
     out = f"posts/{date}-{hhmm.replace(':', '')}.jpg"
     make(entry["quote"], out, f"backgrounds/{bg}", entry.get("spot"))
-    print(f"[{slot}] {entry['quote']}  ({bg}) -> {out}")
+    story = out.replace(".jpg", "-story.jpg") if cfg.get("stories") else None
+    if story:
+        make_story(out, f"backgrounds/{bg}", story)
+    print(f"[{slot}] {entry['quote']}  ({bg}) -> {out}" + (f" + {story}" if story else ""))
     if DRY:
         return
 
@@ -170,6 +173,26 @@ def publish_one(slot, cfg):
         git("pull", "-q", "--rebase", "origin", "main")
         git("push", "-q", "origin", "HEAD")
         raise
+    if story:  # the feed post is out; a failed story only warns, it never undoes the post
+        share_story(ig_id, slot, f"https://raw.githubusercontent.com/{REPO}/{sha}/{story}")
+
+
+def share_story(ig_id, slot, url):
+    try:
+        container = api("POST", f"{ig_id}/media", image_url=url, media_type="STORIES")["id"]
+        for _ in range(30):
+            status = api("GET", container, fields="status_code").get("status_code")
+            if status == "FINISHED":
+                break
+            if status in ("ERROR", "EXPIRED"):
+                raise SystemExit(f"story image {status}")
+            time.sleep(5)
+        else:
+            raise SystemExit("story still processing after 150 s")
+        story = api("POST", f"{ig_id}/media_publish", creation_id=container)
+        note(f"Story for {slot} published: media id {story['id']}")
+    except SystemExit as e:
+        print(f"::warning::Post is out, but the story for {slot} failed: {e}", flush=True)
 
 
 def upload(ig_id, me, slot, entry, image_url):

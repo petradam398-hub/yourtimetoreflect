@@ -129,5 +129,17 @@ def make(text, out, bg="background.jpg", spot=None):
     img.save(out, quality=95)
 
 
+def make_story(post_path, bg, out):
+    """9:16 story (1080x1920): the finished post in the middle, on a blurred and
+    darkened copy of the same photo, so it fills the whole phone screen."""
+    sw, sh = 1080, 1920
+    back = ImageOps.fit(Image.open(bg).convert("RGB"), (sw, sh), Image.LANCZOS)
+    back = back.filter(ImageFilter.GaussianBlur(40))
+    back = Image.blend(back, Image.new("RGB", (sw, sh), (0, 0, 0)), 0.55)
+    post = Image.open(post_path).convert("RGB")
+    back.paste(post, (0, (sh - post.height) // 2))
+    back.save(out, quality=92)
+
+
 if __name__ == "__main__":
     make(sys.argv[1], sys.argv[2], *(sys.argv[3:4]))
