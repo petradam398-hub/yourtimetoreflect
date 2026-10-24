@@ -140,7 +140,14 @@ def publish_one(slot, cfg):
     if DRY:
         return
 
+    # make sure Instagram accepts us before touching the queue (a blocked app or an
+    # expired token must not use up posts)
+    me = api("GET", "me", fields="user_id,username")
+    ig_id = me["user_id"]
+
     # record first, so a crash after publishing can never post the same entry twice
+    tracked = ["queue.json", "quotes_used.txt", "backgrounds_used.txt", "posted_log.txt"]
+    snapshot = {f: open(f).read() if os.path.exists(f) else "" for f in tracked}
     save("queue.json", queue[1:])
     append("quotes_used.txt", entry["quote"].rstrip("."))
     append("backgrounds_used.txt", f"{date} {bg}")
@@ -151,9 +158,21 @@ def publish_one(slot, cfg):
     git("push", "-q", "origin", "HEAD")
     sha = subprocess.run(["git", "rev-parse", "HEAD"], capture_output=True, text=True, check=True).stdout.strip()
     image_url = f"https://raw.githubusercontent.com/{REPO}/{sha}/{out}"
+    try:
+        upload(ig_id, me, slot, entry, image_url)
+    except SystemExit:
+        # not published: give the entry back so it goes out at the next time slot
+        for f, text in snapshot.items():
+            with open(f, "w") as fh:
+                fh.write(text)
+        git("add", "-A")
+        git("commit", "-qm", f"Undo failed post {slot}")
+        git("pull", "-q", "--rebase", "origin", "main")
+        git("push", "-q", "origin", "HEAD")
+        raise
 
-    me = api("GET", "me", fields="user_id,username")
-    ig_id = me["user_id"]
+
+def upload(ig_id, me, slot, entry, image_url):
     container = api("POST", f"{ig_id}/media", image_url=image_url, caption=entry["caption"])["id"]
     for _ in range(30):  # Instagram downloads and processes the image first
         status = api("GET", container, fields="status_code").get("status_code")
