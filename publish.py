@@ -124,6 +124,23 @@ def git(*args):
         fail(f"git {' '.join(args[:2])} failed: {(r.stderr or r.stdout).strip()[-400:]}")
 
 
+def claim(slot):
+    """Push the bookkeeping commit as a lock: only the run whose push lands first may
+    publish this slot. A rejected push means something changed on GitHub meanwhile;
+    if that was another run taking this slot, we stop, otherwise rebase and retry."""
+    for _ in range(5):
+        if subprocess.run(["git", "push", "-q", "origin", "HEAD"], capture_output=True).returncode == 0:
+            return True
+        git("fetch", "-q", "origin", "main")
+        theirs = subprocess.run(["git", "show", "origin/main:posted_log.txt"],
+                                capture_output=True, text=True).stdout.splitlines()
+        if slot in (l.strip() for l in theirs):
+            git("reset", "-q", "--hard", "origin/main")
+            return False
+        git("rebase", "-q", "origin/main")
+    fail(f"could not push the post record for {slot}")
+
+
 def publish_one(slot, cfg):
     queue = load("queue.json", [])
     if not queue:
@@ -157,8 +174,9 @@ def publish_one(slot, cfg):
     append("posted_log.txt", slot)
     git("add", "-A")
     git("commit", "-qm", f"Post {slot}")
-    git("pull", "-q", "--rebase", "origin", "main")  # keep edits made meanwhile (e.g. config.json)
-    git("push", "-q", "origin", "HEAD")
+    if not claim(slot):
+        note(f"{slot} was already posted by another run - skipping")
+        return
     sha = subprocess.run(["git", "rev-parse", "HEAD"], capture_output=True, text=True, check=True).stdout.strip()
     image_url = f"https://raw.githubusercontent.com/{REPO}/{sha}/{out}"
     try:
