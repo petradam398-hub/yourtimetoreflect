@@ -3,13 +3,15 @@
   "times": [
     "10:00",
     "12:30",
+    "15:30",
     "18:00"
   ],
-  "max_posts_per_day": 3,
+  "max_posts_per_day": 4,
   "background_cooldown": 5,
   "enabled": true,
   "stories": true,
   "reel_times": [
+    "10:00",
     "18:00"
   ]
 }
