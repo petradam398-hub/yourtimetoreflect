@@ -141,5 +141,48 @@ def make_story(post_path, bg, out):
     back.save(out, quality=92)
 
 
+REEL_SECONDS = 8
+
+
+def ambient_track(out, seconds=REEL_SECONDS):
+    """Fallback soundtrack when music/ is empty: a slow, dark synth pad (A minor),
+    generated here, so there are no copyright problems."""
+    import subprocess
+    notes = [55.0, 110.0, 130.81, 164.81, 220.0]  # A1 A2 C3 E3 A3
+    voices = "+".join(f"0.16*sin(2*PI*{f}*t)*(0.6+0.4*sin(2*PI*{0.07 + i * 0.03:.2f}*t))"
+                      for i, f in enumerate(notes))
+    subprocess.run([
+        "ffmpeg", "-y", "-loglevel", "error", "-f", "lavfi",
+        "-i", f"aevalsrc='{voices}':s=44100:d={seconds}",
+        "-af", f"lowpass=f=900,aecho=0.8:0.7:120|260:0.35|0.2,afade=t=in:d=1.5,"
+               f"afade=t=out:st={seconds - 2}:d=2,volume=1.4",
+        "-c:a", "aac", "-b:a", "160k", out], check=True)
+
+
+def make_reel(story_path, out, music=None, seconds=REEL_SECONDS):
+    """Reel: the 9:16 story frame with a slow zoom-in, plus music (a random file from
+    music/ if there is one, otherwise the generated pad). H.264 + AAC, as Instagram wants."""
+    import glob, random, subprocess, tempfile
+    tracks = [] if music else sorted(glob.glob(os.path.join(os.path.dirname(os.path.abspath(__file__)), "music", "*.mp3")))
+    music = music or (random.choice(tracks) if tracks else None)
+    tmp = None
+    if not music:
+        tmp = tempfile.NamedTemporaryFile(suffix=".m4a", delete=False).name
+        ambient_track(tmp, seconds)
+        music = tmp
+    frames = seconds * 30
+    subprocess.run([
+        "ffmpeg", "-y", "-loglevel", "error", "-loop", "1", "-i", story_path, "-i", music,
+        "-filter_complex",
+        f"[0:v]scale=2160:3840,zoompan=z='1+0.07*on/{frames}':x='iw/2-(iw/zoom/2)':"
+        f"y='ih/2-(ih/zoom/2)':d={frames}:s=1080x1920:fps=30,format=yuv420p[v];"
+        f"[1:a]afade=t=out:st={seconds - 1.5}:d=1.5[a]",
+        "-map", "[v]", "-map", "[a]", "-t", str(seconds), "-c:v", "libx264", "-preset", "medium",
+        "-crf", "24", "-profile:v", "high", "-c:a", "aac", "-b:a", "160k", "-ar", "44100",
+        "-movflags", "+faststart", out], check=True)
+    if tmp:
+        os.unlink(tmp)
+
+
 if __name__ == "__main__":
     make(sys.argv[1], sys.argv[2], *(sys.argv[3:4]))

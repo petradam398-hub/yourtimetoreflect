@@ -15,7 +15,7 @@ from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 from urllib import request, parse, error
 
-from make_post import make, make_story, is_readable, readability
+from make_post import make, make_reel, make_story, is_readable, readability
 
 API = "https://graph.instagram.com/v23.0"
 REPO = os.environ.get("GITHUB_REPOSITORY", "petradam398-hub/yourtimetoreflect")
@@ -165,10 +165,13 @@ def publish_one(slot, cfg):
         bg = pick_background(cfg, entry["quote"])
     out = f"posts/{date}-{hhmm.replace(':', '')}.jpg"
     make(entry["quote"], out, f"backgrounds/{bg}", entry.get("spot"))
-    story = out.replace(".jpg", "-story.jpg") if cfg.get("stories") else None
+    reel = out.replace(".jpg", ".mp4") if hhmm in cfg.get("reel_times", []) else None
+    story = out.replace(".jpg", "-story.jpg") if (cfg.get("stories") or reel) else None
     if story:
         make_story(out, f"backgrounds/{bg}", story)
-    print(f"[{slot}] {entry['quote']}  ({bg}) -> {out}" + (f" + {story}" if story else ""))
+    if reel:  # the reel is the 9:16 story frame, slowly zooming in, with music
+        make_reel(story, reel)
+    print(f"[{slot}] {entry['quote']}  ({bg}) -> {reel or out}" + (f" + {story}" if story else ""))
     if DRY:
         return
 
@@ -190,9 +193,9 @@ def publish_one(slot, cfg):
         note(f"{slot} was already posted by another run - skipping")
         return
     sha = subprocess.run(["git", "rev-parse", "HEAD"], capture_output=True, text=True, check=True).stdout.strip()
-    image_url = f"https://raw.githubusercontent.com/{REPO}/{sha}/{out}"
+    image_url = f"https://raw.githubusercontent.com/{REPO}/{sha}/{reel or out}"
     try:
-        new_post = upload(ig_id, me, slot, entry, image_url)
+        new_post = upload(ig_id, me, slot, entry, image_url, is_reel=bool(reel))
     except SystemExit:
         # not published: give the entry back so it goes out at the next time slot
         for f, text in snapshot.items():
@@ -203,7 +206,7 @@ def publish_one(slot, cfg):
         git("pull", "-q", "--rebase", "origin", "main")
         git("push", "-q", "origin", "HEAD")
         raise
-    if story and new_post:  # the feed post is out; a failed story only warns, it never undoes the post
+    if story and cfg.get("stories") and new_post:  # the feed post is out; a failed story only warns, it never undoes the post
         share_story(ig_id, slot, f"https://raw.githubusercontent.com/{REPO}/{sha}/{story}")
 
 
@@ -225,6 +228,20 @@ def share_story(ig_id, slot, url):
         print(f"::warning::Post is out, but the story for {slot} failed: {e}", flush=True)
 
 
+def wait_ready(container, url, tries=30, pause=5):
+    """Instagram downloads and processes the file before it can be published."""
+    status = None
+    for _ in range(tries):
+        info = api("GET", container, fields="status_code,status")
+        status = info.get("status_code")
+        if status == "FINISHED":
+            return
+        if status in ("ERROR", "EXPIRED"):
+            fail(f"Instagram could not process {url} ({status}: {info.get('status', '')})")
+        time.sleep(pause)
+    fail(f"Instagram was still processing {url} after {tries * pause} s ({status})")
+
+
 def already_live(ig_id, caption, hours=12):
     """True if a post with this exact caption went out in the last hours (e.g. a run
     that got an error back although Instagram published it anyway)."""
@@ -237,20 +254,16 @@ def already_live(ig_id, caption, hours=12):
     return False
 
 
-def upload(ig_id, me, slot, entry, image_url):
+def upload(ig_id, me, slot, entry, image_url, is_reel=False):
     if already_live(ig_id, entry["caption"]):
         note(f"{slot}: this post is already on Instagram - not posting it again")
         return False
-    container = api("POST", f"{ig_id}/media", image_url=image_url, caption=entry["caption"])["id"]
-    for _ in range(30):  # Instagram downloads and processes the image first
-        status = api("GET", container, fields="status_code").get("status_code")
-        if status == "FINISHED":
-            break
-        if status in ("ERROR", "EXPIRED"):
-            fail(f"Instagram could not process the image ({status}) for {image_url}")
-        time.sleep(5)
+    if is_reel:
+        params = dict(media_type="REELS", video_url=image_url, share_to_feed="true")
     else:
-        fail(f"Instagram was still processing the image after 150 s ({status}) for {image_url}")
+        params = dict(image_url=image_url)
+    container = api("POST", f"{ig_id}/media", caption=entry["caption"], **params)["id"]
+    wait_ready(container, image_url, tries=60 if is_reel else 30, pause=10 if is_reel else 5)
     try:
         post = api("POST", f"{ig_id}/media_publish", creation_id=container)
     except SystemExit:
@@ -276,11 +289,17 @@ def check():
         status = api("GET", container, fields="status_code").get("status_code")
         if status == "FINISHED":
             note("Publish permission OK - test image accepted (not published)")
-            return
+            break
         if status in ("ERROR", "EXPIRED"):
             fail(f"Instagram rejected the test image ({status})")
         time.sleep(5)
-    fail("Instagram did not finish processing the test image in time")
+    else:
+        fail("Instagram did not finish processing the test image in time")
+    if os.path.exists("tests/reel-test.mp4"):
+        url = f"https://raw.githubusercontent.com/{REPO}/main/tests/reel-test.mp4"
+        c = api("POST", f"{me['user_id']}/media", media_type="REELS", video_url=url, caption="test")["id"]
+        wait_ready(c, url, tries=60, pause=10)
+        note("Reel OK - test video accepted (not published)")
 
 
 def main():

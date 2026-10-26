@@ -8,5 +8,8 @@
   "max_posts_per_day": 3,
   "background_cooldown": 5,
   "enabled": true,
-  "stories": true
+  "stories": true,
+  "reel_times": [
+    "18:00"
+  ]
 }
