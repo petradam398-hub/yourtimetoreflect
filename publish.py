@@ -165,7 +165,8 @@ def publish_one(slot, cfg):
         bg = pick_background(cfg, entry["quote"])
     out = f"posts/{date}-{hhmm.replace(':', '')}.jpg"
     make(entry["quote"], out, f"backgrounds/{bg}", entry.get("spot"))
-    reel = out.replace(".jpg", ".mp4") if hhmm in cfg.get("reel_times", []) else None
+    as_reel = hhmm in cfg.get("reel_times", []) or os.environ.get("AS_REEL") == "1"
+    reel = out.replace(".jpg", ".mp4") if as_reel else None
     story = out.replace(".jpg", "-story.jpg") if (cfg.get("stories") or reel) else None
     if story:
         make_story(out, f"backgrounds/{bg}", story)

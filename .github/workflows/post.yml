@@ -6,9 +6,9 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: "dry = render only, check = test token without posting, force = publish one post now"
+        description: "dry = render only, dry-reel = render the next post as a reel, check = test without posting, force = publish one post now"
         type: choice
-        options: [dry, check, force]
+        options: [dry, dry-reel, check, force]
         default: dry
 
 permissions:
@@ -33,15 +33,16 @@ jobs:
       - name: Publish due posts
         env:
           IG_ACCESS_TOKEN: ${{ secrets.IG_ACCESS_TOKEN }}
-          DRY_RUN: ${{ github.event.inputs.mode == 'dry' && '1' || '0' }}
-          FORCE: ${{ github.event.inputs.mode == 'force' && '1' || '0' }}
+          DRY_RUN: ${{ (github.event.inputs.mode == 'dry' || github.event.inputs.mode == 'dry-reel') && '1' || '0' }}
+          FORCE: ${{ (github.event.inputs.mode == 'force' || github.event.inputs.mode == 'dry-reel') && '1' || '0' }}
+          AS_REEL: ${{ github.event.inputs.mode == 'dry-reel' && '1' || '0' }}
           CHECK: ${{ github.event.inputs.mode == 'check' && '1' || '0' }}
         run: |
           git config user.name "yourtimetoreflect-bot"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           python publish.py
       - name: Keep rendered preview (dry run)
-        if: github.event.inputs.mode == 'dry'
+        if: github.event.inputs.mode == 'dry' || github.event.inputs.mode == 'dry-reel'
         uses: actions/upload-artifact@v4
         with:
           name: preview
