@@ -78,8 +78,17 @@ def api(method, path, **params):
         fail(f"Instagram API error {e.code} on {path}: {body}")
 
 
+RUN_ID = os.environ.get("GITHUB_RUN_ID", "local")
+
+
+def posted_slots(text=None):
+    """Slots already posted ("YYYY-MM-DD HH:MM"); log lines may carry a run id after it."""
+    rows = text.splitlines() if text is not None else lines("posted_log.txt")
+    return {" ".join(r.split()[:2]) for r in rows if r.strip()}
+
+
 def due_slots(cfg, now):
-    posted = set(lines("posted_log.txt"))
+    posted = posted_slots()
     today = now.date().isoformat()
     slots = []
     for t in sorted(cfg["times"]):
@@ -95,7 +104,7 @@ def due_slots(cfg, now):
 
 def next_slot(cfg, now):
     """The next not-yet-posted slot starting within LOOKAHEAD (to wait for), or None."""
-    posted = set(lines("posted_log.txt"))
+    posted = posted_slots()
     for t in sorted(cfg["times"]):
         h, m = map(int, t.split(":"))
         at = now.replace(hour=h, minute=m, second=0, microsecond=0)
@@ -133,11 +142,14 @@ def claim(slot):
             return True
         git("fetch", "-q", "origin", "main")
         theirs = subprocess.run(["git", "show", "origin/main:posted_log.txt"],
-                                capture_output=True, text=True).stdout.splitlines()
-        if slot in (l.strip() for l in theirs):
+                                capture_output=True, text=True).stdout
+        if slot in posted_slots(theirs):
             git("reset", "-q", "--hard", "origin/main")
             return False
         git("rebase", "-q", "origin/main")
+        if slot not in posted_slots():  # our record got dropped - never publish without one
+            git("reset", "-q", "--hard", "origin/main")
+            return False
     fail(f"could not push the post record for {slot}")
 
 
@@ -171,7 +183,7 @@ def publish_one(slot, cfg):
     save("queue.json", queue[1:])
     append("quotes_used.txt", entry["quote"].rstrip("."))
     append("backgrounds_used.txt", f"{date} {bg}")
-    append("posted_log.txt", slot)
+    append("posted_log.txt", f"{slot} {RUN_ID}")
     git("add", "-A")
     git("commit", "-qm", f"Post {slot}")
     if not claim(slot):
@@ -180,7 +192,7 @@ def publish_one(slot, cfg):
     sha = subprocess.run(["git", "rev-parse", "HEAD"], capture_output=True, text=True, check=True).stdout.strip()
     image_url = f"https://raw.githubusercontent.com/{REPO}/{sha}/{out}"
     try:
-        upload(ig_id, me, slot, entry, image_url)
+        new_post = upload(ig_id, me, slot, entry, image_url)
     except SystemExit:
         # not published: give the entry back so it goes out at the next time slot
         for f, text in snapshot.items():
@@ -191,7 +203,7 @@ def publish_one(slot, cfg):
         git("pull", "-q", "--rebase", "origin", "main")
         git("push", "-q", "origin", "HEAD")
         raise
-    if story:  # the feed post is out; a failed story only warns, it never undoes the post
+    if story and new_post:  # the feed post is out; a failed story only warns, it never undoes the post
         share_story(ig_id, slot, f"https://raw.githubusercontent.com/{REPO}/{sha}/{story}")
 
 
@@ -213,7 +225,22 @@ def share_story(ig_id, slot, url):
         print(f"::warning::Post is out, but the story for {slot} failed: {e}", flush=True)
 
 
+def already_live(ig_id, caption, hours=12):
+    """True if a post with this exact caption went out in the last hours (e.g. a run
+    that got an error back although Instagram published it anyway)."""
+    recent = api("GET", f"{ig_id}/media", fields="caption,timestamp", limit="15").get("data", [])
+    cutoff = datetime.now(ZoneInfo("UTC")) - timedelta(hours=hours)
+    for m in recent:
+        ts = datetime.strptime(m.get("timestamp", "1970-01-01T00:00:00+0000"), "%Y-%m-%dT%H:%M:%S%z")
+        if ts >= cutoff and (m.get("caption") or "").strip() == caption.strip():
+            return True
+    return False
+
+
 def upload(ig_id, me, slot, entry, image_url):
+    if already_live(ig_id, entry["caption"]):
+        note(f"{slot}: this post is already on Instagram - not posting it again")
+        return False
     container = api("POST", f"{ig_id}/media", image_url=image_url, caption=entry["caption"])["id"]
     for _ in range(30):  # Instagram downloads and processes the image first
         status = api("GET", container, fields="status_code").get("status_code")
@@ -224,8 +251,16 @@ def upload(ig_id, me, slot, entry, image_url):
         time.sleep(5)
     else:
         fail(f"Instagram was still processing the image after 150 s ({status}) for {image_url}")
-    post = api("POST", f"{ig_id}/media_publish", creation_id=container)
+    try:
+        post = api("POST", f"{ig_id}/media_publish", creation_id=container)
+    except SystemExit:
+        time.sleep(20)
+        if already_live(ig_id, entry["caption"], hours=1):
+            note(f"{slot}: Instagram reported an error but the post is live - keeping it")
+            return True
+        raise
     note(f"Published {slot} to @{me.get('username')}: media id {post['id']}")
+    return True
 
 
 def check():
@@ -233,6 +268,8 @@ def check():
     created and processed but never published (Instagram discards it after 24 h)."""
     me = api("GET", "me", fields="user_id,username,account_type")
     note(f"Token OK for @{me.get('username')} ({me.get('account_type')})")
+    recent = api("GET", f"{me['user_id']}/media", fields="caption,timestamp", limit="3").get("data", [])
+    note(f"Duplicate guard OK - can read the {len(recent)} latest posts")
     url = f"https://raw.githubusercontent.com/{REPO}/main/backgrounds/hoodie-teal.jpg"
     container = api("POST", f"{me['user_id']}/media", image_url=url, caption="test")["id"]
     for _ in range(30):
@@ -260,7 +297,7 @@ def main():
     if FORCE:
         slots = [now.strftime("%Y-%m-%d %H:%M")]
     else:
-        posted_today = [l for l in lines("posted_log.txt") if l.startswith(now.date().isoformat())]
+        posted_today = [p for p in posted_slots() if p.startswith(now.date().isoformat())]
         room = max(0, int(cfg.get("max_posts_per_day", 25)) - len(posted_today))
         slots = due_slots(cfg, now)[:room]
         if not slots and room and not DRY:
