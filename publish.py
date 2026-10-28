@@ -153,12 +153,21 @@ def claim(slot):
     fail(f"could not push the post record for {slot}")
 
 
+def caption_for(entry, hhmm, cfg):
+    """Captions are written as: text / question / hashtags. The question asks people to
+    comment; only the slots in question_times keep it, so it is not in every post."""
+    parts = entry["caption"].split("\n\n")
+    if len(parts) == 3 and hhmm not in cfg.get("question_times", []):
+        parts = [parts[0], parts[2]]
+    return "\n\n".join(parts)
+
+
 def publish_one(slot, cfg):
     queue = load("queue.json", [])
     if not queue:
         fail("queue.json is empty - add new quotes before the next post")
-    entry = queue[0]
     date, hhmm = slot.split()
+    entry = dict(queue[0], caption=caption_for(queue[0], hhmm, cfg))
     # entries written for a specific photo keep it; others get a readable random one
     bg = entry.get("background")
     if not bg or not os.path.exists(f"backgrounds/{bg}"):

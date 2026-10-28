@@ -12,6 +12,10 @@
   "stories": true,
   "reel_times": [
     "10:00",
+    "15:30",
+    "18:00"
+  ],
+  "question_times": [
     "18:00"
   ]
 }
