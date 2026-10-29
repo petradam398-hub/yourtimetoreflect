@@ -167,20 +167,32 @@ def publish_one(slot, cfg):
     if not queue:
         fail("queue.json is empty - add new quotes before the next post")
     date, hhmm = slot.split()
-    entry = dict(queue[0], caption=caption_for(queue[0], hhmm, cfg))
-    # entries written for a specific photo keep it; others get a readable random one
-    bg = entry.get("background")
-    if not bg or not os.path.exists(f"backgrounds/{bg}"):
-        bg = pick_background(cfg, entry["quote"])
-    out = f"posts/{date}-{hhmm.replace(':', '')}.jpg"
-    make(entry["quote"], out, f"backgrounds/{bg}", entry.get("spot"))
     as_reel = hhmm in cfg.get("reel_times", []) or os.environ.get("AS_REEL") == "1"
-    reel = out.replace(".jpg", ".mp4") if as_reel else None
-    story = out.replace(".jpg", "-story.jpg") if (cfg.get("stories") or reel) else None
-    if story:
-        make_story(out, f"backgrounds/{bg}", story)
-    if reel:  # the reel is the 9:16 story frame, slowly zooming in, with music
-        make_reel(story, reel)
+    # ready-made video reels (entries with "video") can only go out in a reel slot
+    k = 0 if as_reel else next((i for i, e in enumerate(queue) if not e.get("video")), None)
+    if k is None:
+        fail("queue.json has only video reels left - a photo post needs a photo entry")
+    entry = dict(queue[k], caption=caption_for(queue[k], hhmm, cfg))
+    base = f"posts/{date}-{hhmm.replace(':', '')}"
+    if entry.get("video"):
+        bg, out, reel = "video", None, entry["video"]
+        story = f"{base}-story.jpg" if cfg.get("stories") else None
+        if story:  # a still from the reel
+            subprocess.run(["ffmpeg", "-loglevel", "error", "-y", "-ss", "1.5", "-i", reel,
+                            "-frames:v", "1", "-q:v", "3", story], check=True)
+    else:
+        # entries written for a specific photo keep it; others get a readable random one
+        bg = entry.get("background")
+        if not bg or not os.path.exists(f"backgrounds/{bg}"):
+            bg = pick_background(cfg, entry["quote"])
+        out = f"{base}.jpg"
+        make(entry["quote"], out, f"backgrounds/{bg}", entry.get("spot"))
+        reel = f"{base}.mp4" if as_reel else None
+        story = f"{base}-story.jpg" if (cfg.get("stories") or reel) else None
+        if story:
+            make_story(out, f"backgrounds/{bg}", story)
+        if reel:  # the reel is the 9:16 story frame, slowly zooming in, with music
+            make_reel(story, reel)
     print(f"[{slot}] {entry['quote']}  ({bg}) -> {reel or out}" + (f" + {story}" if story else ""))
     if DRY:
         return
@@ -193,7 +205,7 @@ def publish_one(slot, cfg):
     # record first, so a crash after publishing can never post the same entry twice
     tracked = ["queue.json", "quotes_used.txt", "backgrounds_used.txt", "posted_log.txt"]
     snapshot = {f: open(f).read() if os.path.exists(f) else "" for f in tracked}
-    save("queue.json", queue[1:])
+    save("queue.json", queue[:k] + queue[k + 1:])
     append("quotes_used.txt", entry["quote"].rstrip("."))
     append("backgrounds_used.txt", f"{date} {bg}")
     append("posted_log.txt", f"{slot} {RUN_ID}")
