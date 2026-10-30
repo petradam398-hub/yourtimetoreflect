@@ -74,6 +74,9 @@ def encode(frames_dir, music, seconds, out):
 
 
 def centered(d, lines, f, y_mid, lh, fill=WHITE):
+    while max(d.textlength(l, font=f) for l in lines) > W - 160:  # keep a margin on both sides
+        lh = lh * (f.size - 4) / f.size
+        f = font(f.size - 4)
     y = y_mid - lh * len(lines) / 2
     for l in lines:
         d.text((W / 2, y), l, font=f, fill=fill, anchor="ma")
@@ -165,3 +168,39 @@ def year_progress(day, music, out, seconds=12.0, seed=5):
         img.save(f"{tmp}/{n + 1:04d}.jpg", quality=90)
     encode(tmp, music, seconds, out)
     return pct, left
+
+
+# ---------- 3) counter ----------
+
+def counter(top, value, below, final, music, out, suffix="", seconds=12.0, seed=11):
+    """top lines, then a number counting up from 0 to value (with suffix), lines below,
+    and a closing line that fades in at the end."""
+    layers, vig = fog_layers(seed)
+    rng = np.random.default_rng(seed)
+    tmp = tempfile.mkdtemp()
+    f_top, f_num, f_below, f_final = font(80), font(210), font(80), font(92)
+    probe = ImageDraw.Draw(Image.new("L", (1, 1)))
+    suffix = suffix.upper()
+    end_txt = f"{value:,}{suffix}".replace(",", " ")
+    while probe.textlength(end_txt, font=f_num) > W - 140:
+        f_num = font(f_num.size - 8)
+    for n in range(int(seconds * FPS)):
+        t = n / FPS
+        img = background(t, layers, vig, rng)
+        d = ImageDraw.Draw(img)
+        a = min(1, t / 0.6)
+        centered(d, [l.upper() for l in top], f_top, H * 0.27, 92, fill=(int(220 * a),) * 3)
+        p = min(1.0, max(0.0, (t - 1.0) / 4.0))
+        p = 1 - (1 - p) ** 3
+        cur = int(round(value * p))
+        pop = 1 + 0.06 * max(0, 1 - abs(t - 5.0) / 0.25) if t > 4.7 else 1
+        fn = font(int(f_num.size * pop)) if pop > 1.001 else f_num
+        d.text((W / 2, H * 0.45), f"{cur:,}{suffix}".replace(",", " "), font=fn, fill=WHITE, anchor="mm")
+        if t > 1.6:
+            b = min(1, (t - 1.6) / 0.6)
+            centered(d, [l.upper() for l in below], f_below, H * 0.60, 92, fill=(int(200 * b),) * 3)
+        if t > 6.8:
+            c = min(1, (t - 6.8) / 0.6)
+            centered(d, [l.upper() for l in final], f_final, H * 0.78, 104, fill=(int(240 * c),) * 3)
+        img.save(f"{tmp}/{n + 1:04d}.jpg", quality=90)
+    encode(tmp, music, seconds, out)
