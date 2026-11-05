@@ -1,5 +1,70 @@
 [
   {
+    "quote": "5 rules every man should know",
+    "carousel": [
+      "carousels/c01/01.jpg",
+      "carousels/c01/02.jpg",
+      "carousels/c01/03.jpg",
+      "carousels/c01/04.jpg",
+      "carousels/c01/05.jpg",
+      "carousels/c01/06.jpg",
+      "carousels/c01/07.jpg"
+    ],
+    "caption": "Five simple rules. Most men break at least one every day.\nSave this for later.\n\nWhich rule is the hardest for you?\n\n#selfimprovement #discipline #mindset #habits #growth #motivation #timetoreflect"
+  },
+  {
+    "quote": "5 habits that will change your body",
+    "carousel": [
+      "carousels/c02/01.jpg",
+      "carousels/c02/02.jpg",
+      "carousels/c02/03.jpg",
+      "carousels/c02/04.jpg",
+      "carousels/c02/05.jpg",
+      "carousels/c02/06.jpg",
+      "carousels/c02/07.jpg"
+    ],
+    "caption": "No secret pills. Just five habits done every day.\nSave this for later.\n\nWhich habit are you missing?\n\n#gym #discipline #fitness #gymmotivation #habits #noexcuses #timetoreflect"
+  },
+  {
+    "quote": "5 money rules for young men",
+    "carousel": [
+      "carousels/c03/01.jpg",
+      "carousels/c03/02.jpg",
+      "carousels/c03/03.jpg",
+      "carousels/c03/04.jpg",
+      "carousels/c03/05.jpg",
+      "carousels/c03/06.jpg",
+      "carousels/c03/07.jpg"
+    ],
+    "caption": "Nobody teaches this in school.\nStart now and thank yourself in ten years.\nSave this for later.\n\nWhich rule do you already follow?\n\n#money #saving #discipline #mindset #wealth #success #timetoreflect"
+  },
+  {
+    "quote": "5 things to stop doing in your 20s",
+    "carousel": [
+      "carousels/c04/01.jpg",
+      "carousels/c04/02.jpg",
+      "carousels/c04/03.jpg",
+      "carousels/c04/04.jpg",
+      "carousels/c04/05.jpg",
+      "carousels/c04/06.jpg",
+      "carousels/c04/07.jpg"
+    ],
+    "caption": "Your 20s decide a lot.\nStop these five things and you are ahead of most people.\nSave this for later.\n\nWhich one do you need to stop?\n\n#selfimprovement #discipline #mindset #habits #growth #motivation #timetoreflect"
+  },
+  {
+    "quote": "5 ways to build real discipline",
+    "carousel": [
+      "carousels/c05/01.jpg",
+      "carousels/c05/02.jpg",
+      "carousels/c05/03.jpg",
+      "carousels/c05/04.jpg",
+      "carousels/c05/05.jpg",
+      "carousels/c05/06.jpg",
+      "carousels/c05/07.jpg"
+    ],
+    "caption": "Discipline is not a gift. It is built.\nThese five steps are where it starts.\nSave this for later.\n\nWhich one will you start today?\n\n#selfimprovement #discipline #mindset #habits #growth #motivation #timetoreflect"
+  },
+  {
     "quote": "3 hours on your phone every day. 45 days of every year gone. Put the phone down. Go build something",
     "video": "reels/m04.mp4",
     "caption": "Your screen time is not a small number.\nIt is weeks of your life every year.\n\nWhat does your screen time say today?\n\n#focus #discipline #digitaldetox #mindset #selfimprovement #grind #timetoreflect"
@@ -100,6 +165,11 @@
     "caption": "Life will hit you.\nBe ready to hit back.\n\nWhat are you fighting for right now?\n\n#boxing #fighter #discipline #mindset #mentalstrength #nevergiveup #timetoreflect"
   },
   {
+    "quote": "Walk 10 000 steps a day. 3 650 000 steps in one year. Just start walking",
+    "video": "reels/f06.mp4",
+    "caption": "10 000 steps sounds like a lot.\nIt is just one long walk a day.\n\nHow many steps did you do today?\n\n#gym #discipline #fitness #gymmotivation #mindset #noexcuses #timetoreflect"
+  },
+  {
     "quote": "Smile. You know something they don't",
     "background": "money-n25.jpg",
     "caption": "They think you are wasting your time.\nYou know what is coming.\n\nWhat are you building that nobody sees?\n\n#money #success #discipline #mindset #wealth #grind #timetoreflect"
@@ -113,6 +183,11 @@
     "quote": "Strong arms. Strong mind. No excuses",
     "background": "gym-n44.jpg",
     "caption": "The body follows the mind.\nMake both strong.\n\nWhich one is stronger right now?\n\n#gym #discipline #fitness #gymmotivation #mindset #noexcuses #timetoreflect"
+  },
+  {
+    "quote": "30 minutes of scrolling a day. 182 hours of your year. Read instead. Build instead",
+    "video": "reels/f07.mp4",
+    "caption": "Half an hour a day does not look like much.\nIt adds up to more than a week of your year.\n\nWhat would you do with 182 extra hours?\n\n#selfimprovement #discipline #mindset #habits #growth #motivation #timetoreflect"
   },
   {
     "quote": "Strong body. Strong mind. Strong bank account",
@@ -130,6 +205,11 @@
     "caption": "Stop looking at the people next to you.\nLook at the road in front of you.\n\nAre you running your own race?\n\n#focus #discipline #mindset #selfimprovement #grind #lonewolf #timetoreflect"
   },
   {
+    "quote": "50 squats a day. 18 250 squats in one year. Strong legs are built daily",
+    "video": "reels/f08.mp4",
+    "caption": "No gym needed.\nJust 50 squats, every single day.\n\nCan you do 50 squats right now?\n\n#gym #discipline #fitness #gymmotivation #mindset #noexcuses #timetoreflect"
+  },
+  {
     "quote": "No days off. No excuses. No regrets",
     "background": "gym-00.jpg",
     "caption": "Rest is part of the plan. Excuses are not.\nKnow the difference.\n\nWhen did you last skip a workout?\n\n#gym #discipline #fitness #gymmotivation #mindset #noexcuses #timetoreflect"
@@ -145,6 +225,11 @@
     "caption": "Anyone can work hard for likes.\nReal men work hard when nobody sees it.\n\nWould you still train if nobody ever saw it?\n\n#gym #discipline #fitness #gymmotivation #mindset #noexcuses #timetoreflect"
   },
   {
+    "quote": "Learn 5 new words a day. 1 825 new words in one year. Grow your mind every day",
+    "video": "reels/f09.mp4",
+    "caption": "5 words a day is easy.\nIn a year you speak a new level of English.\n\nWhat language are you learning?\n\n#selfimprovement #discipline #mindset #habits #growth #motivation #timetoreflect"
+  },
+  {
     "quote": "Wake up before the sun. Train while they sleep. Win while they wonder how",
     "video": "reels/v10.mp4",
     "caption": "The early hours are free.\nMost people waste them in bed.\n\nWhat time did you wake up today?\n\n#gym #discipline #fitness #gymmotivation #mindset #noexcuses #timetoreflect"
@@ -158,6 +243,11 @@
     "quote": "Build the body. The respect will follow",
     "background": "gym-27.jpg",
     "caption": "People notice a man who takes care of himself.\nStart today, not on Monday.\n\nWhen did you start training?\n\n#gym #discipline #fitness #gymmotivation #mindset #noexcuses #timetoreflect"
+  },
+  {
+    "quote": "Skip one 4 € coffee a day. 1 460 € saved in one year. Small cuts. Big savings",
+    "video": "reels/f10.mp4",
+    "caption": "One coffee does not feel like much.\nOne year of coffee is 1 460 €.\n\nWhat small thing costs you the most money?\n\n#money #saving #discipline #mindset #wealth #success #timetoreflect"
   },
   {
     "quote": "Train until the sun goes down",

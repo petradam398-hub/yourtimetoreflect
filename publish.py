@@ -168,13 +168,23 @@ def publish_one(slot, cfg):
         fail("queue.json is empty - add new quotes before the next post")
     date, hhmm = slot.split()
     as_reel = hhmm in cfg.get("reel_times", []) or os.environ.get("AS_REEL") == "1"
-    # ready-made video reels (entries with "video") can only go out in a reel slot
-    k = 0 if as_reel else next((i for i, e in enumerate(queue) if not e.get("video")), None)
+    # ready-made video reels ("video") only go out in reel slots, carousels ("carousel")
+    # only in photo slots; plain quote entries fit both
+    if as_reel:
+        k = next((i for i, e in enumerate(queue) if not e.get("carousel")), None)
+    else:
+        k = next((i for i, e in enumerate(queue) if not e.get("video")), None)
     if k is None:
-        fail("queue.json has only video reels left - a photo post needs a photo entry")
+        fail("queue.json has no entry that fits this slot (reel or photo) - add new posts")
     entry = dict(queue[k], caption=caption_for(queue[k], hhmm, cfg))
     base = f"posts/{date}-{hhmm.replace(':', '')}"
-    if entry.get("video"):
+    slides = entry.get("carousel")
+    if slides:
+        bg, out, reel = "carousel", slides[0], None
+        story = f"{base}-story.jpg" if cfg.get("stories") else None
+        if story:  # the cover slide as the story
+            make_story(slides[0], slides[0], story)
+    elif entry.get("video"):
         bg, out, reel = "video", None, entry["video"]
         story = f"{base}-story.jpg" if cfg.get("stories") else None
         if story:  # a still from the reel
@@ -215,9 +225,11 @@ def publish_one(slot, cfg):
         note(f"{slot} was already posted by another run - skipping")
         return
     sha = subprocess.run(["git", "rev-parse", "HEAD"], capture_output=True, text=True, check=True).stdout.strip()
-    image_url = f"https://raw.githubusercontent.com/{REPO}/{sha}/{reel or out}"
+    raw = f"https://raw.githubusercontent.com/{REPO}/{sha}"
+    image_url = f"{raw}/{reel or out}"
     try:
-        new_post = upload(ig_id, me, slot, entry, image_url, is_reel=bool(reel))
+        new_post = upload(ig_id, me, slot, entry, image_url, is_reel=bool(reel),
+                          slide_urls=[f"{raw}/{x}" for x in slides] if slides else None)
     except SystemExit:
         # not published: give the entry back so it goes out at the next time slot
         for f, text in snapshot.items():
@@ -276,11 +288,18 @@ def already_live(ig_id, caption, hours=12):
     return False
 
 
-def upload(ig_id, me, slot, entry, image_url, is_reel=False):
+def upload(ig_id, me, slot, entry, image_url, is_reel=False, slide_urls=None):
     if already_live(ig_id, entry["caption"]):
         note(f"{slot}: this post is already on Instagram - not posting it again")
         return False
-    if is_reel:
+    if slide_urls:  # carousel: one container per slide, then the album container
+        children = []
+        for u in slide_urls:
+            c = api("POST", f"{ig_id}/media", image_url=u, is_carousel_item="true")["id"]
+            wait_ready(c, u)
+            children.append(c)
+        params = dict(media_type="CAROUSEL", children=",".join(children))
+    elif is_reel:
         params = dict(media_type="REELS", video_url=image_url, share_to_feed="true")
     else:
         params = dict(image_url=image_url)
@@ -322,6 +341,16 @@ def check():
         c = api("POST", f"{me['user_id']}/media", media_type="REELS", video_url=url, caption="test")["id"]
         wait_ready(c, url, tries=60, pause=10)
         note("Reel OK - test video accepted (not published)")
+    if os.path.exists("carousels/c01/01.jpg"):
+        kids = []
+        for n in ("01", "02"):
+            u = f"https://raw.githubusercontent.com/{REPO}/main/carousels/c01/{n}.jpg"
+            c = api("POST", f"{me['user_id']}/media", image_url=u, is_carousel_item="true")["id"]
+            wait_ready(c, u)
+            kids.append(c)
+        album = api("POST", f"{me['user_id']}/media", media_type="CAROUSEL", children=",".join(kids), caption="test")["id"]
+        wait_ready(album, "carousel test")
+        note("Carousel OK - test album accepted (not published)")
 
 
 def main():
