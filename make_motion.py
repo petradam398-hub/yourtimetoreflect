@@ -204,3 +204,41 @@ def counter(top, value, below, final, music, out, suffix="", seconds=12.0, seed=
             centered(d, [l.upper() for l in final], f_final, H * 0.78, 104, fill=(int(240 * c),) * 3)
         img.save(f"{tmp}/{n + 1:04d}.jpg", quality=90)
     encode(tmp, music, seconds, out)
+
+
+# ---------- 4) fact reel: hook on screen from frame 0, short, loops well ----------
+
+def fact(top, value, below, final, music, out, prefix="", suffix="", seconds=7.0, seed=21):
+    """Short number reel built for retention: the hook (top) is readable in the very
+    first frame, the number counts up immediately and lands with a flash at ~2.2 s,
+    the explanation follows, and the closing line shows from ~3.8 s."""
+    layers, vig = fog_layers(seed)
+    rng = np.random.default_rng(seed)
+    tmp = tempfile.mkdtemp()
+    probe = ImageDraw.Draw(Image.new("L", (1, 1)))
+    prefix, suffix = prefix.upper(), suffix.upper()
+    f_num = font(250)
+    end_txt = f"{prefix}{value:,}{suffix}".replace(",", " ")
+    while probe.textlength(end_txt, font=f_num) > W - 140:
+        f_num = font(f_num.size - 8)
+    land = 2.2
+    for n in range(int(seconds * FPS)):
+        t = n / FPS
+        glow = max(0.0, 0.5 - abs(t - land)) * 1.2 if t >= land - 0.05 else 0.0
+        img = background(t, layers, vig, rng, glow)
+        d = ImageDraw.Draw(img)
+        centered(d, [l.upper() for l in top], font(96), H * 0.25, 108)  # readable at frame 0
+        p = min(1.0, t / land)
+        p = 1 - (1 - p) ** 3
+        cur = int(round(value * p))
+        pop = 1 + 0.10 * max(0, 1 - abs(t - land) / 0.2)
+        fn = font(int(f_num.size * pop)) if pop > 1.001 else f_num
+        d.text((W / 2, H * 0.44), f"{prefix}{cur:,}{suffix}".replace(",", " "), font=fn, fill=WHITE, anchor="mm")
+        if t > land:
+            b = min(1, (t - land) / 0.3)
+            centered(d, [l.upper() for l in below], font(80), H * 0.58, 92, fill=(int(200 * b),) * 3)
+        if t > 3.8:
+            c = min(1, (t - 3.8) / 0.35)
+            centered(d, [l.upper() for l in final], font(96), H * 0.76, 108, fill=(int(240 * c),) * 3)
+        img.save(f"{tmp}/{n + 1:04d}.jpg", quality=90)
+    encode(tmp, music, seconds, out)
