@@ -121,8 +121,11 @@ def kinetic(steps, music, out, seconds=13.0, seed=3, final=None):
             dt = t - pick[i]
             phrase = steps[i].upper()
             scale = 1.0 + 0.12 * max(0.0, 1 - dt / 0.18)  # quick pop, then settle
-            f = font(int(150 * scale)) if scale > 1.001 else big
             d = ImageDraw.Draw(img)
+            size = 150
+            while d.textlength(phrase, font=font(size)) > W - 140:  # long phrases get smaller
+                size -= 6
+            f = font(int(size * scale))
             # earlier phrases stay as a faint stack above the current one
             for j, prev in enumerate(steps[:i][-3:]):
                 k = len(steps[:i][-3:]) - j
