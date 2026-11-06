@@ -73,6 +73,21 @@ def encode(frames_dir, music, seconds, out):
                     "-movflags", "+faststart", out], check=True)
 
 
+def split_long(d, lines, f, max_w=W - 160):
+    """A line that does not fit at this size is split into two balanced lines
+    instead of being shrunk (keeps small text readable on a phone)."""
+    out = []
+    for l in lines:
+        words = l.split()
+        if d.textlength(l, font=f) <= max_w or len(words) < 2:
+            out.append(l)
+            continue
+        best = min(range(1, len(words)), key=lambda i: abs(d.textlength(" ".join(words[:i]), font=f)
+                                                          - d.textlength(" ".join(words[i:]), font=f)))
+        out += [" ".join(words[:best]), " ".join(words[best:])]
+    return out
+
+
 def centered(d, lines, f, y_mid, lh, fill=WHITE):
     while max(d.textlength(l, font=f) for l in lines) > W - 160:  # keep a margin on both sides
         lh = lh * (f.size - 4) / f.size
@@ -108,14 +123,14 @@ def kinetic(steps, music, out, seconds=13.0, seed=3, final=None):
         if final and shown and len(shown) == len(steps) and t - pick[-1] > 0.9:
             d = ImageDraw.Draw(img)
             b = min(1, (t - pick[-1] - 0.9) / 0.4)
-            fb = big
-            while d.textlength(final[1].upper(), font=fb) > W - 160:  # keep a margin on both sides
+            small = split_long(d, [final[0].upper()], font(72))
+            fb = font(130)
+            bigl = split_long(d, [final[1].upper()], fb)
+            while max(d.textlength(l, font=fb) for l in bigl) > W - 140:
                 fb = font(fb.size - 6)
-            fs = font(70)
-            while d.textlength(final[0].upper(), font=fs) > W - 160:
-                fs = font(fs.size - 4)
-            d.text((W / 2, H * 0.44), final[0].upper(), font=fs, fill=(int(170 * b),) * 3, anchor="mm")
-            d.text((W / 2, H * 0.51), final[1].upper(), font=fb, fill=(int(240 * b),) * 3, anchor="mm")
+            y_small = H * 0.46 - 84 * len(small)
+            centered(d, small, font(72), y_small + 42 * len(small), 84, fill=(int(170 * b),) * 3)
+            centered(d, bigl, fb, H * 0.46 + fb.size * 0.6 * len(bigl), int(fb.size * 1.1), fill=(int(240 * b),) * 3)
         elif shown:
             i = shown[-1]
             dt = t - pick[i]
@@ -239,9 +254,10 @@ def fact(top, value, below, final, music, out, prefix="", suffix="", seconds=7.0
         d.text((W / 2, H * 0.44), f"{prefix}{cur:,}{suffix}".replace(",", " "), font=fn, fill=WHITE, anchor="mm")
         if t > land:
             b = min(1, (t - land) / 0.3)
-            centered(d, [l.upper() for l in below], font(80), H * 0.58, 92, fill=(int(200 * b),) * 3)
+            bl = split_long(d, [l.upper() for l in below], font(80))
+            centered(d, bl, font(80), H * 0.58 + 46 * (len(bl) - 1), 92, fill=(int(200 * b),) * 3)
         if t > 3.8:
             c = min(1, (t - 3.8) / 0.35)
-            centered(d, [l.upper() for l in final], font(96), H * 0.76, 108, fill=(int(240 * c),) * 3)
+            centered(d, [l.upper() for l in final], font(96), H * 0.78, 108, fill=(int(240 * c),) * 3)
         img.save(f"{tmp}/{n + 1:04d}.jpg", quality=90)
     encode(tmp, music, seconds, out)
